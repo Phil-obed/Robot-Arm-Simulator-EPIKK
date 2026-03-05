@@ -2,6 +2,123 @@
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
+
+// ROBOT LIBRARY-------------------
+const ROBOT_LIB = [
+  {
+    id: 'edu2',
+    name: '2-Axis Edu Arm',
+    category: 'Educational',
+    description: 'Simple 2-joint planar arm for learning FK basics.',
+    dof: 2,
+    links: [200, 160],
+    limits: [[-170,170],[-150,150]],
+    types: ['R','R'],
+    baseHeight: 40,
+    eeType: 'open-gripper',
+    mass: '0.8 kg',
+    payload: '0.2 kg',
+    repeatability: '±2.0 mm',
+    reach: '360 mm',
+    color: '#a0c4ff',
+  },
+  {
+    id: 'scara4',
+    name: 'SCARA 4-DOF',
+    category: 'Industrial',
+    description: 'Selective compliance arm for pick-and-place tasks.',
+    dof: 4,
+    links: [225, 175, 0, 130],
+    limits: [[-170,170],[-145,145],[-180,180],[-360,360]],
+    types: ['R','R','P','R'],
+    baseHeight: 60,
+    eeType: 'suction-cup',
+    mass: '24 kg',
+    payload: '5 kg',
+    repeatability: '±0.02 mm',
+    reach: '400 mm',
+    color: '#ffd6a5',
+  },
+  {
+    id: 'hobby5',
+    name: '5-Axis Hobby Arm',
+    category: 'Hobby',
+    description: 'Servo-driven desktop arm, ideal for prototyping.',
+    dof: 5,
+    links: [120, 110, 90, 70, 50],
+    limits: [[-180,180],[-90,90],[-120,120],[-180,180],[-90,90]],
+    types: ['R','R','R','R','R'],
+    baseHeight: 50,
+    eeType: 'claw-gripper',
+    mass: '1.2 kg',
+    payload: '0.5 kg',
+    repeatability: '±1.0 mm',
+    reach: '440 mm',
+    color: '#caffbf',
+  },
+  {
+    id: 'cobot6',
+    name: '6-DOF Cobot',
+    category: 'Collaborative',
+    description: 'Safe human-robot collaborative arm with torque sensing.',
+    dof: 6,
+    links: [180, 220, 170, 120, 90, 60],
+    limits: [[-170,170],[-90,90],[-135,135],[-170,170],[-120,120],[-360,360]],
+    types: ['R','R','R','R','R','R'],
+    baseHeight: 80,
+    eeType: 'two-finger-gripper',
+    mass: '33.5 kg',
+    payload: '10 kg',
+    repeatability: '±0.03 mm',
+    reach: '840 mm',
+    color: '#ffadad',
+  },
+  {
+    id: 'delta3',
+    name: '3-Axis Delta',
+    category: 'Industrial',
+    description: 'High-speed parallel robot for packaging lines.',
+    dof: 3,
+    links: [180, 160, 140],
+    limits: [[-60,60],[-60,60],[-60,60]],
+    types: ['R','R','R'],
+    baseHeight: 200,
+    eeType: 'suction-cup',
+    mass: '15 kg',
+    payload: '2 kg',
+    repeatability: '±0.1 mm',
+    reach: '480 mm',
+    color: '#bdb2ff',
+  },
+  {
+    id: 'welding6',
+    name: '6-DOF Welding Arm',
+    category: 'Industrial',
+    description: 'Heavy-duty arm optimised for arc welding paths.',
+    dof: 6,
+    links: [280, 260, 200, 140, 110, 70],
+    limits: [[-185,185],[-95,155],[-180,75],[-400,400],[-120,120],[-400,400]],
+    types: ['R','R','R','R','R','R'],
+    baseHeight: 100,
+    eeType: 'welding-torch',
+    mass: '250 kg',
+    payload: '30 kg',
+    repeatability: '±0.06 mm',
+    reach: '1060 mm',
+    color: '#f4a261',
+  },
+];
+
+// EE type icon map (unicode / text fallback)
+const EE_ICONS = {
+  'open-gripper':     '⟂',
+  'suction-cup':      '◎',
+  'claw-gripper':     '⌥',
+  'two-finger-gripper':'⊓',
+  'welding-torch':    '⌁',
+};
+// ROBOT LIBRARY  end -------------------
+
 const DEF = {
   dof:6,
   links:[180,220,170,120,90,60],
@@ -153,6 +270,184 @@ function buildPoseList(){
     el.appendChild(d);
   });
 }
+
+
+// ROBOT LIBRARY LOGIC -----------------------
+let libOpen    = false;
+let libFilter  = 'All';
+let libSelected = null; // robot id
+
+function toggleLib(){
+  libOpen = !libOpen;
+  document.getElementById('pLib').classList.toggle('off', !libOpen);
+  document.getElementById('btnLib').classList.toggle('on',  libOpen);
+  // Close left config panel to avoid overlap
+  if(libOpen && PO.L){ closeP('L'); }
+  if(libOpen) buildLibUI();
+}
+
+function closeLib(){
+  libOpen = false;
+  document.getElementById('pLib').classList.add('off');
+  document.getElementById('btnLib').classList.remove('on');
+}
+
+function buildLibUI(){
+  buildLibCats();
+  buildLibCards();
+}
+
+function buildLibCats(){
+  const cats = ['All', ...new Set(ROBOT_LIB.map(r=>r.category))];
+  const el = document.getElementById('libCats');
+  el.innerHTML = '';
+  cats.forEach(c=>{
+    const b = document.createElement('button');
+    b.className = 'cat-pill' + (libFilter===c?' on':'');
+    b.textContent = c;
+    b.onclick = ()=>{ libFilter=c; buildLibUI(); };
+    el.appendChild(b);
+  });
+}
+
+function buildLibCards(){
+  const filtered = libFilter==='All'
+    ? ROBOT_LIB
+    : ROBOT_LIB.filter(r=>r.category===libFilter);
+
+  const el = document.getElementById('libCards');
+  el.innerHTML = '';
+  filtered.forEach(r=>{
+    const maxReach = r.links.reduce((a,b)=>a+b,0);
+    const card = document.createElement('div');
+    card.className = 'lib-card' + (libSelected===r.id?' selected':'');
+    card.innerHTML = `
+      <div class="lib-card-swatch" style="background:${r.color}18;color:${r.color}">
+        ${EE_ICONS[r.eeType]||'◉'}
+      </div>
+      <div class="lib-card-info">
+        <div class="lib-card-name">${r.name}</div>
+        <div class="lib-card-sub">${r.category} · ${r.eeType.replace(/-/g,' ')}</div>
+      </div>
+      <div class="lib-card-dof">${r.dof}DOF</div>
+    `;
+    card.onclick = ()=> selectLibRobot(r.id);
+    el.appendChild(card);
+  });
+}
+
+function selectLibRobot(id){
+  libSelected = id;
+  buildLibCards(); // re-render to update selection highlight
+
+  const r = ROBOT_LIB.find(x=>x.id===id);
+  if(!r) return;
+
+  // Show spec panel
+  const spec = document.getElementById('libSpec');
+  spec.style.display = 'block';
+
+  document.getElementById('specName').textContent  = r.name;
+  document.getElementById('specCat').textContent   = r.category + ' · ' + r.eeType.replace(/-/g,' ');
+  document.getElementById('specDesc').textContent  = r.description;
+
+  // Spec grid rows
+  const rows = [
+    ['DOF',           r.dof],
+    ['Reach',         r.reach],
+    ['Payload',       r.payload],
+    ['Mass',          r.mass],
+    ['Repeatability', r.repeatability],
+    ['Base Height',   r.baseHeight + ' mm'],
+    ['EE Type',       (EE_ICONS[r.eeType]||'') + ' ' + r.eeType.replace(/-/g,' ')],
+    ['Links',         r.links.map(l=>l+'mm').join(' · ')],
+  ];
+  const grid = document.getElementById('specGrid');
+  grid.innerHTML = '';
+  rows.forEach(([k,v])=>{
+    const d = document.createElement('div');
+    d.className = 'spec-row';
+    d.innerHTML = `<span class="spec-k">${k}</span><span class="spec-v">${v}</span>`;
+    grid.appendChild(d);
+  });
+
+  // Draw mini preview
+  drawLibPreview(r);
+}
+
+function loadLibRobot(){
+  if(!libSelected) return;
+  const r = ROBOT_LIB.find(x=>x.id===libSelected);
+  if(!r) return;
+
+  T.dof    = r.dof;
+  T.links  = [...r.links];
+  T.limits = r.limits.map(l=>[...l]);
+  T.types  = [...r.types];
+  T.angles = new Array(r.dof).fill(0);
+  T.home   = new Array(r.dof).fill(0);
+
+  document.getElementById('dofsel').value = r.dof;
+  selectedJoint = -1;
+  buildAll();
+  toast(`Loaded: ${r.name}`);
+  closeLib();
+  // Re-open config panel so user can see what loaded
+  PO.L = true; applyP('L');
+}
+
+// ── Mini canvas preview ─────────────────────────────────
+function drawLibPreview(r){
+  const cv = document.getElementById('libPreview');
+  const g  = cv.getContext('2d');
+  const W = 56, H = 56;
+  g.clearRect(0,0,W,H);
+
+  const maxLen = r.links.reduce((a,b)=>a+b,0);
+  const scale  = (H * 0.72) / maxLen;
+  const cx = W/2, cy = H - 8;
+
+  // Faint grid
+  g.strokeStyle = 'rgba(128,128,128,0.1)';
+  g.lineWidth   = 0.5;
+  for(let i=8;i<W;i+=8){ g.beginPath();g.moveTo(i,0);g.lineTo(i,H);g.stroke() }
+  for(let i=8;i<H;i+=8){ g.beginPath();g.moveTo(0,i);g.lineTo(W,i);g.stroke() }
+
+  // Draw links radiating upward in a gentle fan
+  let px=cx, py=cy, angle = -Math.PI/2;
+  const fanStep = r.dof > 1 ? (Math.PI * 0.55) / (r.dof - 1) : 0;
+  const startAngle = -Math.PI/2 - (Math.PI*0.55)/2;
+
+  g.lineCap = 'round';
+  r.links.forEach((len, i)=>{
+    const a   = startAngle + i * fanStep;
+    const sl  = len * scale;
+    const nx  = px + sl * Math.cos(a);
+    const ny  = py + sl * Math.sin(a);
+    const t   = i / Math.max(r.dof-1, 1);
+    g.strokeStyle = r.color;
+    g.globalAlpha = 0.45 + t * 0.45;
+    g.lineWidth   = Math.max(1.5, 4 - i * 0.5);
+    g.beginPath(); g.moveTo(px,py); g.lineTo(nx,ny); g.stroke();
+    // Joint dot
+    g.globalAlpha = 1;
+    g.beginPath(); g.arc(px,py, 2, 0, Math.PI*2);
+    g.fillStyle = isDark ? '#111213' : '#f0f0ee'; g.fill();
+    g.strokeStyle = r.color; g.lineWidth = 1; g.stroke();
+    px=nx; py=ny;
+  });
+
+  // EE dot
+  g.beginPath(); g.arc(px,py, 3, 0, Math.PI*2);
+  g.fillStyle = r.color;
+  g.globalAlpha = 1;
+  g.shadowColor = r.color; g.shadowBlur = 6;
+  g.fill();
+  g.shadowBlur = 0;
+}
+
+// ROBOT LIBRARY LOGIC end -----------------------
+
 
 // ═══════════════════════════════════════════════
 // FORWARD KINEMATICS
